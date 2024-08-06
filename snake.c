@@ -5,8 +5,9 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
+#include <termios.h>
 
-#define SLEEP_TIME 400000
+#define SLEEP_TIME 60000
 
 #define UP 1
 #define RIGHT 2
@@ -14,6 +15,24 @@
 #define LEFT 4
 
 #define NUMBER_OF_OBS 5
+
+
+struct termios orig_termios;
+void disable_raw_mode(){
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
+}
+
+void enable_raw_mode(){
+
+    tcgetattr(STDIN_FILENO, &orig_termios);
+    atexit(disable_raw_mode);
+
+    struct termios raw = orig_termios;
+
+    raw.c_lflag &= ~(ECHO | ICANON);
+
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
+}
 
 int screen_height;
 int screen_width;
@@ -79,6 +98,8 @@ void game_init(){
     game.is_running = 1;
 }
 
+
+char pressed_key;
 void game_elements_init(){
     get_screen_measurements();
     //printf("%d, %d", screen_width, screen_height);
@@ -86,6 +107,8 @@ void game_elements_init(){
     game_init();
     snake_init();
     obs_init();
+
+    pressed_key = '\0';
 }
 
 
@@ -97,11 +120,72 @@ void print_at(int y, int x, char c){
     printf("\033[%d;%dH%c", x, y, c);
 }
 
+void set_dir(){
+    switch (pressed_key){
+        case 'w':
+            snake.direction = UP;
+            break;
+        case 'd':
+            snake.direction = RIGHT;
+            break;
+        case 's':
+            snake.direction = DOWN;
+            break;
+        case 'a':
+            snake.direction = LEFT;
+            break;
+        default:
+            break;
+    }
+}
+
+void listen_for_key(){
+
+    fd_set fd;
+    FD_ZERO(&fd);
+    FD_SET(STDIN_FILENO, &fd);
+
+    struct timeval timeint;
+    timeint.tv_sec = 0;
+    timeint.tv_usec = SLEEP_TIME;
+
+    int res = select(STDIN_FILENO + 1, &fd, NULL, NULL, &timeint);
+
+    if(res > 0){
+        read(STDIN_FILENO, &pressed_key, 1);
+
+        set_dir();
+    }
+}
+
+void move_snake(){
+     switch (snake.direction){
+        case UP:
+            snake.head.y--;
+            break;
+        case RIGHT:
+            snake.head.x++;
+            break;
+        case DOWN:
+            snake.head.y++;
+            break;
+        case LEFT:
+            snake.head.x--;
+            break;
+        default:
+            exit(EXIT_FAILURE);
+    }
+}
+
 void game_loop(){
     while(game.is_running){
         fflush(stdout);
 
         clear_screen();
+
+        listen_for_key();
+
+        move_snake();
 
         print_at(snake.head.x, snake.head.y, 'x');
 
@@ -114,6 +198,9 @@ void game_loop(){
 
 int main(){
     game_elements_init();
+
+    enable_raw_mode();
+
     game_loop();
 
     return 0;
