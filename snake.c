@@ -70,8 +70,8 @@ typedef struct{
 
 Obs obs[NUMBER_OF_OBS];
 void generate_obs_coords(int number){
-    int x = rand() % screen_width + 1;
-    int y = rand() % screen_height + 1;
+    int x = (rand() % screen_width - 2) + 2;
+    int y = (rand() % screen_height - 4) + 4;
     obs[number].obs_position.x = x;
     obs[number].obs_position.y = y;
 }
@@ -119,6 +119,10 @@ void print_at(int y, int x, char c){
     printf("\033[%d;%dH%c", x, y, c);
 }
 
+void move_cursor_to_end(){
+    printf("\033[%d;%dH", screen_height + 1, 1);
+}
+
 void set_dir(){
     switch (pressed_key){
         case 'w':
@@ -158,6 +162,12 @@ void listen_for_key(){
 }
 
 void move_snake(){
+    
+        for(int i = snake.body_size; i >= 2; --i)
+            snake.body[i-1] = snake.body[i-2];
+        if(snake.body_size >= 1){
+            snake.body[0] = snake.head;
+        }
      switch (snake.direction){
         case UP:
             snake.head.y--;
@@ -176,23 +186,106 @@ void move_snake(){
     }
 }
 
+void print_obs(){
+    for(int i = 0; i < NUMBER_OF_OBS; ++i)
+        print_at(obs[i].obs_position.x, obs[i].obs_position.y, 'o');
+}
+
+void print_snake(){
+    print_at(snake.head.x, snake.head.y, 'X');
+    for(int i = 0; i < snake.body_size; ++i)
+        print_at(snake.body[i].x, snake.body[i].y, 'x');
+}
+
+void print_elements(){
+    print_obs();
+    print_snake();
+}
+
+void print_score(){
+    printf("\033[1;1H%s %d", "Your score is:", game.score);
+
+}
+
+void add_body_part(){
+    switch (snake.direction){
+    case UP:
+        if(snake.body_size != 0){
+            snake.body[snake.body_size].x = snake.body[snake.body_size - 1].x;
+            snake.body[snake.body_size].y = snake.body[snake.body_size - 1].y + 1;
+        }else{
+            snake.body[snake.body_size].x = snake.head.x;
+            snake.body[snake.body_size].y = snake.head.y + 1;
+        }
+        break;
+    case RIGHT:
+        if(snake.body_size != 0){
+            snake.body[snake.body_size].x = snake.body[snake.body_size - 1].x - 1;
+            snake.body[snake.body_size].y = snake.body[snake.body_size - 1].y;
+        }else{
+            snake.body[snake.body_size].x = snake.head.x - 1;
+            snake.body[snake.body_size].y = snake.head.y;
+        }
+        break;
+    case DOWN:
+        if(snake.body_size != 0){
+            snake.body[snake.body_size].x = snake.body[snake.body_size - 1].x;
+            snake.body[snake.body_size].y = snake.body[snake.body_size - 1].y - 1;
+        }else{
+            snake.body[snake.body_size].x = snake.head.x;
+            snake.body[snake.body_size].y = snake.head.y - 1;
+        }
+        break;
+    case LEFT:
+        if(snake.body_size != 0){
+            snake.body[snake.body_size].x = snake.body[snake.body_size - 1].x + 1;
+            snake.body[snake.body_size].y = snake.body[snake.body_size - 1].y;
+        }else{
+            snake.body[snake.body_size].x = snake.head.x + 1;
+            snake.body[snake.body_size].y = snake.head.y;
+        }
+        break;
+    default:
+        exit(EXIT_FAILURE);
+    }
+    snake.body_size++;
+}
+
+void check_colosions(){
+    for(int i = 0; i < NUMBER_OF_OBS; ++i){
+        if(snake.head.x == obs[i].obs_position.x && snake.head.y == obs[i].obs_position.y){
+            game.score++;
+            add_body_part();
+            generate_obs_coords(i);
+        }
+    }
+
+    if(snake.head.x <= 0 || snake.head.x >= screen_width || snake.head.y <= 0 || snake.head.y >= screen_height)
+        snake.alive = 0;
+}
+
 void game_loop(){
     while(game.is_running){
         fflush(stdout);
-
         clear_screen();
 
-        listen_for_key();
+        print_score();
 
         move_snake();
 
-        print_at(snake.head.x, snake.head.y, 'x');
+        listen_for_key();
+
+        print_elements();
+        check_colosions();
 
         if(!snake.alive)
             game.is_running = 0;
 
         usleep(game.sleep_time);
     }
+
+    if(!snake.alive)
+        move_cursor_to_end();
 }
 
 int main(){
