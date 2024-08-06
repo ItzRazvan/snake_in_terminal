@@ -7,15 +7,12 @@
 #include <unistd.h>
 #include <termios.h>
 
-#define SLEEP_TIME 60000
-
 #define UP 1
 #define RIGHT 2
 #define DOWN 3
 #define LEFT 4
 
 #define NUMBER_OF_OBS 5
-
 
 struct termios orig_termios;
 void disable_raw_mode(){
@@ -89,6 +86,7 @@ typedef struct{
     int score;
     int max_score;
     bool is_running;
+    int sleep_time;
 } Game;
 
 Game game;
@@ -96,6 +94,7 @@ void game_init(){
     game.score = 0;
     game.max_score = 0;
     game.is_running = 1;
+    game.sleep_time = 10000000 / (screen_width + screen_width);
 }
 
 
@@ -147,7 +146,7 @@ void listen_for_key(){
 
     struct timeval timeint;
     timeint.tv_sec = 0;
-    timeint.tv_usec = SLEEP_TIME;
+    timeint.tv_usec = game.sleep_time;
 
     int res = select(STDIN_FILENO + 1, &fd, NULL, NULL, &timeint);
 
@@ -192,7 +191,7 @@ void game_loop(){
         if(!snake.alive)
             game.is_running = 0;
 
-        usleep(SLEEP_TIME);
+        usleep(game.sleep_time);
     }
 }
 
