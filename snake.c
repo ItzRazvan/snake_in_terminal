@@ -262,6 +262,11 @@ void check_colosions(){
 
     if(snake.head.x <= 0 || snake.head.x >= screen_width || snake.head.y <= 0 || snake.head.y >= screen_height)
         snake.alive = 0;
+
+    for(int i = 0; i < snake.body_size; ++i)
+        if(snake.head.x == snake.body[i].x && snake.head.y == snake.body[i].y)
+            snake.alive = 0;
+    
 }
 
 void game_loop(){
@@ -276,6 +281,7 @@ void game_loop(){
         listen_for_key();
 
         print_elements();
+        
         check_colosions();
 
         if(!snake.alive)
