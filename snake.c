@@ -1,10 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <stdbool.h>
 #include <time.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <unistd.h>
+
+#define SLEEP_TIME 400000
 
 #define UP 1
 #define RIGHT 2
@@ -77,27 +79,13 @@ void game_init(){
     game.is_running = 1;
 }
 
-
-char cursor_position[10];
-void cursor_position_init(){
-    cursor_position[0] = '\0';
-    cursor_position[1] = '3';
-    cursor_position[2] = '3';
-    cursor_position[3] = '[';
-    cursor_position[4] = (char)((int)'1' - (int)'0');
-    cursor_position[5] = ';';
-    cursor_position[7] = (char)((int)'1' - (int)'0');
-    cursor_position[8] = 'H';
-    cursor_position[9] = '\0';
-}
-
 void game_elements_init(){
     get_screen_measurements();
+    //printf("%d, %d", screen_width, screen_height);
 
     game_init();
     snake_init();
     obs_init();
-    cursor_position_init();
 }
 
 
@@ -105,20 +93,22 @@ void clear_screen(){
     printf("\033[H\033[J");
 }
 
-void print_at(int x, int y, char c){
+void print_at(int y, int x, char c){
     printf("\033[%d;%dH%c", x, y, c);
 }
 
 void game_loop(){
     while(game.is_running){
+        fflush(stdout);
+
         clear_screen();
 
-        print_at(4, 4, 'a');
+        print_at(snake.head.x, snake.head.y, 'x');
 
         if(!snake.alive)
             game.is_running = 0;
 
-        usleep(80000);
+        usleep(SLEEP_TIME);
     }
 }
 
