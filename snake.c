@@ -3,6 +3,8 @@
 #include <stdbool.h>
 #include <time.h>
 #include <string.h>
+#include <locale.h>
+#include <wchar.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
 #include <termios.h>
@@ -52,6 +54,8 @@ typedef struct{
     int direction;
     int body_size;
     Coords body[300];
+    wchar_t head_symbol;
+    wchar_t body_symbol;
 } Snake;
 
 Snake snake;
@@ -61,11 +65,14 @@ void snake_init(){
     snake.head.y = screen_height / 2;
     snake.body_size = 0;
     snake.direction = RIGHT;
+    snake.head_symbol = L'\u22A0';
+    snake.body_symbol = L'\u2297';
 }
 
 
 typedef struct{
     Coords obs_position;
+    wchar_t symbol;
 } Obs;
 
 Obs obs[NUMBER_OF_OBS];
@@ -78,13 +85,15 @@ void generate_obs_coords(int number){
 
 void obs_init(){
     srand(time(NULL));
-    for(int i = 0; i < NUMBER_OF_OBS; ++i)
+    for(int i = 0; i < NUMBER_OF_OBS; ++i){
         generate_obs_coords(i);
+        obs[i].symbol = L'\u058E';
+    }
 }
 
 typedef struct{
     int score;
-    int max_score;
+    int best_score;
     bool is_running;
     int sleep_time;
 } Game;
@@ -92,7 +101,7 @@ typedef struct{
 Game game;
 void game_init(){
     game.score = 0;
-    game.max_score = 0;
+    game.best_score = 0;
     game.is_running = 1;
     game.sleep_time = 10000000 / (screen_width + screen_width);
 }
@@ -110,13 +119,12 @@ void game_elements_init(){
     pressed_key = '\0';
 }
 
-
 void clear_screen(){
     printf("\033[H\033[J");
 }
 
-void print_at(int y, int x, char c){
-    printf("\033[%d;%dH%c", x, y, c);
+void print_at(int y, int x, wchar_t c){
+    printf("\033[%d;%dH%lc", x, y, c);
 }
 
 void move_cursor_to_end(){
@@ -156,8 +164,9 @@ void listen_for_key(){
 
     if(res > 0){
         read(STDIN_FILENO, &pressed_key, 1);
-
-        set_dir();
+        
+        if(pressed_key != 'r' || pressed_key != 'R' || pressed_key != 'q')
+            set_dir();
     }
 }
 
@@ -188,13 +197,13 @@ void move_snake(){
 
 void print_obs(){
     for(int i = 0; i < NUMBER_OF_OBS; ++i)
-        print_at(obs[i].obs_position.x, obs[i].obs_position.y, 'o');
+        print_at(obs[i].obs_position.x, obs[i].obs_position.y, obs[i].symbol);
 }
 
 void print_snake(){
-    print_at(snake.head.x, snake.head.y, 'X');
+    print_at(snake.head.x, snake.head.y, snake.head_symbol);
     for(int i = 0; i < snake.body_size; ++i)
-        print_at(snake.body[i].x, snake.body[i].y, 'x');
+        print_at(snake.body[i].x, snake.body[i].y, snake.body_symbol);
 }
 
 void print_elements(){
@@ -204,7 +213,6 @@ void print_elements(){
 
 void print_score(){
     printf("\033[1;1H%s %d", "Your score is:", game.score);
-
 }
 
 void add_body_part(){
@@ -269,6 +277,13 @@ void check_colosions(){
     
 }
 
+void print_lose_message(){
+    printf("\033[%d;%dH%s %d",screen_height/2, screen_width/2 - 6, "Best score:", game.best_score);
+    printf("\033[%d;%dH%s",screen_height/2 + 3, screen_width/2 - 15, "If you wanna play again press R");
+    printf("\033[%d;%dH%s",screen_height/2 + 5, screen_width/2 - 15, "If you wanna play quit  press Q");
+    move_cursor_to_end();
+}
+
 void game_loop(){
     while(game.is_running){
         fflush(stdout);
@@ -281,7 +296,7 @@ void game_loop(){
         listen_for_key();
 
         print_elements();
-        
+
         check_colosions();
 
         if(!snake.alive)
@@ -290,16 +305,46 @@ void game_loop(){
         usleep(game.sleep_time);
     }
 
-    if(!snake.alive)
-        move_cursor_to_end();
+    if(!snake.alive){
+        if(game.score > game.best_score)
+            game.best_score = game.score;
+        game.score = 0;
+        print_lose_message();
+    }
 }
 
-int main(){
-    game_elements_init();
 
+void restart_game(){
+    snake_init();
+    obs_init();
+
+    game.is_running = 1;
+
+    pressed_key = '\0';
+}
+
+
+
+
+int main(){
+    setlocale(LC_ALL, "");
     enable_raw_mode();
 
-    game_loop();
+
+    game_elements_init();
+    while(1){
+        game_loop();
+
+            char key;
+            do {
+                key = getchar();
+            } while (key != 'R' && key != 'r' && key != 'q' && key != 'Q');
+
+            if(key == 'q' || key == 'Q')
+                return 0;
+
+        restart_game();
+    }
 
     return 0;
 }
